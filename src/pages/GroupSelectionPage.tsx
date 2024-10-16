@@ -124,15 +124,35 @@ export const GroupSelectionPage: React.FC = () => {
     }
 
     try {
-      const selectedGroup = groups.find(
-        (group) => group.id.toString() === selectedGroupId
+      // First, set the active group
+      const formData = new FormData();
+      formData.append('group_id', selectedGroupId);
+
+      const setActiveGroupResponse = await axios.post(
+        `${API_BASE_URL}users/user-auth/set_active_group/`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        }
       );
 
-      if (selectedGroup) {
-        setSelectedGroup(selectedGroup);
-        navigate("/dashboard");
+      if (setActiveGroupResponse.data.status === 200) {
+        // If setting active group was successful, proceed with group selection
+        const selectedGroup = groups.find(
+          (group) => group.id.toString() === selectedGroupId
+        );
+
+        if (selectedGroup) {
+          setSelectedGroup(selectedGroup);
+          navigate("/dashboard");
+        } else {
+          throw new Error("Selected group not found");
+        }
       } else {
-        throw new Error("Selected group not found");
+        throw new Error("Failed to set active group");
       }
     } catch (error) {
       console.error("Failed to select group:", error);

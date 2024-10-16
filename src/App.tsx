@@ -15,6 +15,7 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { GroupSelectionPage } from "./pages/GroupSelectionPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { StudentGroupsPage } from "./pages/StudentGroupsPage";
+import WordListsPage from "./pages/WordListsPage";
 
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -60,7 +61,7 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
-              <Route path="/word-lists" element={<div>Word Lists Page</div>} />
+              <Route path="/word-lists" element={<WordListsPage />} />
               <Route path="/student-groups" element={<StudentGroupsPage />} />
               <Route path="/settings" element={<div>Settings Page</div>} />
             </Route>

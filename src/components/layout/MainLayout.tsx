@@ -25,6 +25,8 @@ export const MainLayout: React.FC = () => {
     { path: "/dashboard", name: "Dashboard", icon: Palette },
     { path: "/lessons", name: "Lessons", icon: BookOpen },
     { path: "/student-groups", name: "Student Groups", icon: Users },
+    { path: "/word-lists", name: "Word Lists", icon: Users },
+
     { path: "/settings", name: "Settings", icon: Settings },
   ];
 
