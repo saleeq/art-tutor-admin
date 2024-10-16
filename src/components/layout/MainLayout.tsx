@@ -106,7 +106,7 @@ export const MainLayout: React.FC = () => {
         </header>
 
         {/* Breadcrumb */}
-        <nav className="bg-muted px-4 py-2 text-muted-foreground z-10">
+        <nav className="bg-gray-100 px-4 py-2 text-gray-400 text-xs z-10">
           <ol className="flex flex-wrap items-center space-x-2">
             {getBreadcrumbs().map((crumb, index, array) => (
               <li key={crumb.path} className="flex items-center">
