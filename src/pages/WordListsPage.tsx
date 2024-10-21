@@ -54,9 +54,10 @@ const WordListsPage: React.FC = () => {
     .filter(
       (list) => !showOnlyUsers || list.owner.role === "User" || !list.owner.role
     )
-    .filter((list) =>
-      list.owner.name.toLowerCase().includes(studentSearch.toLowerCase())
-    );
+    .filter((list) => {
+      const email = list.owner?.email || "";
+      return email.toLowerCase().includes(studentSearch.toLowerCase());
+    });
 
   const handleWordListSelect = (wordList: WordList) => {
     setSelectedWordList(wordList);
@@ -80,7 +81,7 @@ const WordListsPage: React.FC = () => {
         <div className="w-full lg:w-1/2 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <Input
-              placeholder="Search students"
+              placeholder="Search by email"
               value={studentSearch}
               onChange={(e) => setStudentSearch(e.target.value)}
               className="max-w-xs"
@@ -101,8 +102,8 @@ const WordListsPage: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Email</TableHead>
+                  {!showOnlyUsers && <TableHead>Role</TableHead>}
                   <TableHead>Words</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
@@ -114,12 +115,14 @@ const WordListsPage: React.FC = () => {
                     className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
                   >
                     <TableCell>{wordList.name}</TableCell>
-                    <TableCell>{wordList.owner.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="text-sm">
-                        {wordList.owner.role || "User"}
-                      </Badge>
-                    </TableCell>
+                    <TableCell>{wordList.owner?.email || "N/A"}</TableCell>
+                    {!showOnlyUsers && (
+                      <TableCell>
+                        <Badge variant="outline" className="text-sm">
+                          {wordList.owner?.role || "User"}
+                        </Badge>
+                      </TableCell>
+                    )}
                     <TableCell>{wordList.words.length}</TableCell>
                     <TableCell>
                       <Button
@@ -143,8 +146,8 @@ const WordListsPage: React.FC = () => {
               onWordListUpdate={handleWordListUpdate}
             />
           ) : (
-            <div className="bg-white shadow-md rounded-lg p-4 text-center text-gray-500">
-              Select a word list to view details
+            <div className="bg-white shadow-md rounded-lg p-8 text-center text-gray-500 flex items-center justify-center h-full">
+              <p className="text-lg">Select a word list to view details</p>
             </div>
           )}
         </div>
