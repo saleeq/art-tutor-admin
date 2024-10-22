@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { useParams } from "react-router-dom";
 import { CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,12 +16,30 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-
-import { useAuth } from "../hooks/useAuth";
+import { useAuth } from "@/hooks/useAuth";
 import { WordList, wordListApi } from "@/api/wordListApi";
 import { toast } from "@/hooks/use-toast";
+import { AxiosError } from "axios";
+
+// Update these interfaces to match the actual API response
+interface WordOperationResponse {
+  message: string;
+  word: string;
+}
 
 interface WordListDetailPageProps {
   wordList: WordList;
@@ -33,60 +50,159 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
   wordList,
   onWordListUpdate,
 }) => {
-  const { id } = useParams<{ id: string }>();
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [newWord, setNewWord] = useState("");
+  const [isAddingWord, setIsAddingWord] = useState(false);
+  const [isDeletingWord, setIsDeletingWord] = useState<string | null>(null);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [wordToDelete, setWordToDelete] = useState<string | null>(null);
   const { serverToken } = useAuth();
 
-  const handleAddWord = async () => {
-    if (serverToken && id && newWord.trim()) {
-      try {
-        // const updatedWordList = await wordListApi.addWord(
-        //   serverToken,
-        //   id,
-        //   newWord.trim()
-        // );
-        // onWordListUpdate(updatedWordList);
-        setNewWord("");
-        toast({
-          title: "Word Added",
-          description: `"${newWord.trim()}" has been added to the word list.`,
-        });
-      } catch (error) {
-        console.error("Error adding new word:", error);
+  const handleAddWord = async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+
+    if (!serverToken || !newWord.trim()) return;
+
+    const wordToAdd = newWord.trim();
+
+    // Check for duplicate word
+    if (wordList.words.includes(wordToAdd)) {
+      toast({
+        title: "Error",
+        description: "This word already exists in the list.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsAddingWord(true);
+    try {
+      const response = (await wordListApi.addWord(
+        serverToken,
+        wordList.id,
+        wordToAdd
+      )) as WordOperationResponse;
+
+      // Create updated word list with the new word
+      const updatedWordList = {
+        ...wordList,
+        words: [...wordList.words, response.word],
+      };
+
+      // Update the parent component
+      onWordListUpdate(updatedWordList);
+
+      // Clear the input and close the dialog
+      setNewWord("");
+      setIsAddDialogOpen(false);
+
+      toast({
+        title: "Success",
+        description: response.message,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error adding word:", error);
+
+      if (error instanceof AxiosError) {
+        const errorMessage =
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Failed to add the word. Please try again.";
+
+        if (error.response?.status === 422) {
+          toast({
+            title: "Validation Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        } else {
+          toast({
+            title: "Error",
+            description: errorMessage,
+            variant: "destructive",
+          });
+        }
+      } else {
         toast({
           title: "Error",
-          description: "Failed to add the new word. Please try again.",
+          description:
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred. Please try again.",
           variant: "destructive",
         });
       }
+    } finally {
+      setIsAddingWord(false);
     }
   };
 
-  const handleDeleteWord = async (wordToDelete: string) => {
-    if (serverToken && id) {
-      try {
-        // const updatedWordList = await wordListApi.deleteWord(
-        //   serverToken,
-        //   id,
-        //   wordToDelete
-        // );
-        // onWordListUpdate(updatedWordList);
-        toast({
-          title: "Word Deleted",
-          description: `"${wordToDelete}" has been removed from the word list.`,
-        });
-      } catch (error) {
-        console.error("Error deleting word:", error);
+  const initiateDeleteWord = (word: string) => {
+    setWordToDelete(word);
+  };
+
+  const handleDeleteWord = async () => {
+    if (!serverToken || !wordToDelete) return;
+
+    setIsDeletingWord(wordToDelete);
+    try {
+      const response = (await wordListApi.deleteWord(
+        serverToken,
+        wordList.id,
+        wordToDelete
+      )) as WordOperationResponse;
+
+      // Create updated word list by removing the deleted word
+      const updatedWordList = {
+        ...wordList,
+        words: wordList.words.filter((word) => word !== response.word),
+      };
+
+      // Update the parent component
+      onWordListUpdate(updatedWordList);
+
+      toast({
+        title: "Success",
+        description: response.message,
+        variant: "default",
+      });
+    } catch (error) {
+      console.error("Error deleting word:", error);
+
+      if (error instanceof AxiosError) {
+        const errorMessage =
+          error.response?.data?.detail ||
+          error.response?.data?.message ||
+          "Failed to delete the word. Please try again.";
+
         toast({
           title: "Error",
-          description: "Failed to delete the word. Please try again.",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description:
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred. Please try again.",
           variant: "destructive",
         });
       }
+    } finally {
+      setIsDeletingWord(null);
+      setWordToDelete(null);
     }
   };
+
+  const LoadingSpinner = () => (
+    <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+  );
 
   const filteredWords = wordList.words.filter((word) =>
     word.toLowerCase().includes(searchTerm.toLowerCase())
@@ -103,28 +219,42 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
           <CardTitle className="text-xl font-bold">
             Word List: {wordList.name}
           </CardTitle>
-          <Dialog>
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">Add New Word</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Word</DialogTitle>
+                <DialogDescription>
+                  Enter a new word to add to your word list. Duplicate words are
+                  not allowed.
+                </DialogDescription>
               </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="new-word" className="text-right">
-                    Word
-                  </Label>
-                  <Input
-                    id="new-word"
-                    value={newWord}
-                    onChange={(e) => setNewWord(e.target.value)}
-                    className="col-span-3"
-                  />
+              <form onSubmit={handleAddWord}>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="new-word" className="text-right">
+                      Word
+                    </Label>
+                    <Input
+                      id="new-word"
+                      value={newWord}
+                      onChange={(e) => setNewWord(e.target.value)}
+                      className="col-span-3"
+                      placeholder="Enter a new word"
+                    />
+                  </div>
                 </div>
-              </div>
-              <Button onClick={handleAddWord}>Add Word</Button>
+                <DialogFooter>
+                  <Button
+                    type="submit"
+                    disabled={isAddingWord || !newWord.trim()}
+                  >
+                    {isAddingWord ? <LoadingSpinner /> : "Add Word"}
+                  </Button>
+                </DialogFooter>
+              </form>
             </DialogContent>
           </Dialog>
         </div>
@@ -154,7 +284,7 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
           <TableBody>
             {sortedWords.map((word, index) => (
               <TableRow
-                key={index}
+                key={`${word}-${index}`}
                 className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
               >
                 <TableCell>{word}</TableCell>
@@ -162,9 +292,10 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleDeleteWord(word)}
+                    onClick={() => initiateDeleteWord(word)}
+                    disabled={isDeletingWord === word}
                   >
-                    Delete
+                    {isDeletingWord === word ? <LoadingSpinner /> : "Delete"}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -172,6 +303,31 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog
+        open={!!wordToDelete}
+        onOpenChange={(open) => !open && setWordToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Word</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{wordToDelete}"? This action
+              cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWord}
+              className="bg-red-500 hover:bg-red-600"
+            >
+              {isDeletingWord ? <LoadingSpinner /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

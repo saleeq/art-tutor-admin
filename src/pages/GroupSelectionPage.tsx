@@ -126,7 +126,7 @@ export const GroupSelectionPage: React.FC = () => {
     try {
       // First, set the active group
       const formData = new FormData();
-      formData.append('group_id', selectedGroupId);
+      formData.append("group_id", selectedGroupId);
 
       const setActiveGroupResponse = await axios.post(
         `${API_BASE_URL}users/user-auth/set_active_group/`,
@@ -134,7 +134,7 @@ export const GroupSelectionPage: React.FC = () => {
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'multipart/form-data',
+            "Content-Type": "multipart/form-data",
           },
         }
       );
@@ -147,7 +147,8 @@ export const GroupSelectionPage: React.FC = () => {
 
         if (selectedGroup) {
           setSelectedGroup(selectedGroup);
-          navigate("/dashboard");
+          //navigate("/dashboard");
+          navigate("/word-lists");
         } else {
           throw new Error("Selected group not found");
         }

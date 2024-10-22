@@ -3,10 +3,10 @@ import React, { useState } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import {
-  Palette,
-  BookOpen,
+  // Palette,
+  // BookOpen,
   Users,
-  Settings,
+  // Settings,
   Menu,
   X,
   LogOut,
@@ -22,12 +22,12 @@ export const MainLayout: React.FC = () => {
   const { user, logout } = useAuth();
 
   const navItems = [
-    { path: "/dashboard", name: "Dashboard", icon: Palette },
-    { path: "/lessons", name: "Lessons", icon: BookOpen },
-    { path: "/student-groups", name: "Student Groups", icon: Users },
+    // { path: "/dashboard", name: "Dashboard", icon: Palette },
+    // { path: "/lessons", name: "Lessons", icon: BookOpen },
+    // { path: "/student-groups", name: "Student Groups", icon: Users },
     { path: "/word-lists", name: "Word Lists", icon: Users },
 
-    { path: "/settings", name: "Settings", icon: Settings },
+    // { path: "/settings", name: "Settings", icon: Settings },
   ];
 
   const handleLogout = async () => {
