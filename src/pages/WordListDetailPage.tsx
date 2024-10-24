@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,26 +33,20 @@ import {
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/useAuth";
 import { WordList, wordListApi } from "@/api/wordListApi";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { AxiosError } from "axios";
 import { secondaryDb } from "@/utils/firebase";
 import { doc, setDoc } from "firebase/firestore";
 
-// Update these interfaces to match the actual API response
 interface WordOperationResponse {
   message: string;
   word: string;
 }
 
-interface WordListDetailPageProps {
-  wordList: WordList;
-  onWordListUpdate: (updatedWordList: WordList) => void;
-}
-
-const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
-  wordList,
-  onWordListUpdate,
-}) => {
+const WordListDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [wordList, setWordList] = useState<WordList | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [newWord, setNewWord] = useState("");
@@ -59,14 +54,59 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
   const [isDeletingWord, setIsDeletingWord] = useState<string | null>(null);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [wordToDelete, setWordToDelete] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const { serverToken } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const loadWordList = async () => {
+      if (!serverToken || !id) {
+        console.error("Missing token or id", { hasToken: !!serverToken, id });
+        navigate("/word-lists");
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        console.log("Fetching word list with ID:", id);
+        const allLists = await wordListApi.getAllWordLists(serverToken);
+        const foundList = allLists.find(list => list.id === Number(id));
+        
+        if (!foundList) {
+          console.error("Word list not found");
+          toast({
+            title: "Error",
+            description: "Word list not found",
+            variant: "destructive",
+          });
+          navigate("/word-lists");
+          return;
+        }
+
+        console.log("Found word list:", foundList);
+        setWordList(foundList);
+      } catch (error) {
+        console.error("Error fetching word list:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load word list. Please try again.",
+          variant: "destructive",
+        });
+        setTimeout(() => navigate("/word-lists"), 1000);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadWordList();
+  }, [serverToken, id, navigate, toast]);
 
   const handleAddWord = async (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
     }
 
-    if (!serverToken || !newWord.trim()) return;
+    if (!serverToken || !newWord.trim() || !wordList) return;
 
     const wordToAdd = newWord.trim();
 
@@ -88,13 +128,16 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
         wordToAdd
       )) as WordOperationResponse;
 
-      // Create updated word list with the new word
-      const updatedWordList = {
-        ...wordList,
-        words: [...wordList.words, response.word],
-      };
+      // Update the local state with the new word
+      setWordList((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          words: [...prev.words, response.word],
+        };
+      });
 
-      if(wordList.owner.user_id!=undefined){
+      if (wordList.owner.user_id !== undefined) {
         try {
           const docRef = doc(secondaryDb, "wordList", wordList.owner.user_id.toString());
           await setDoc(
@@ -108,9 +151,6 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
           console.error("Error updating wordList:", error);
         }
       }
-
-      // Update the parent component
-      onWordListUpdate(updatedWordList);
 
       // Clear the input and close the dialog
       setNewWord("");
@@ -130,19 +170,11 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
           error.response?.data?.message ||
           "Failed to add the word. Please try again.";
 
-        if (error.response?.status === 422) {
-          toast({
-            title: "Validation Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
-        } else {
-          toast({
-            title: "Error",
-            description: errorMessage,
-            variant: "destructive",
-          });
-        }
+        toast({
+          title: error.response?.status === 422 ? "Validation Error" : "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
       } else {
         toast({
           title: "Error",
@@ -163,7 +195,7 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
   };
 
   const handleDeleteWord = async () => {
-    if (!serverToken || !wordToDelete) return;
+    if (!serverToken || !wordToDelete || !wordList) return;
 
     setIsDeletingWord(wordToDelete);
     try {
@@ -173,13 +205,16 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
         wordToDelete
       )) as WordOperationResponse;
 
-      // Create updated word list by removing the deleted word
-      const updatedWordList = {
-        ...wordList,
-        words: wordList.words.filter((word) => word !== response.word),
-      };
+      // Update local state by removing the deleted word
+      setWordList((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          words: prev.words.filter((word) => word !== response.word),
+        };
+      });
 
-      if(wordList.owner.user_id!=undefined){
+      if (wordList.owner.user_id !== undefined) {
         try {
           const docRef = doc(secondaryDb, "wordList", wordList.owner.user_id.toString());
           await setDoc(
@@ -193,9 +228,6 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
           console.error("Error updating wordList:", error);
         }
       }
-
-      // Update the parent component
-      onWordListUpdate(updatedWordList);
 
       toast({
         title: "Success",
@@ -236,6 +268,25 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
     <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner />
+      </div>
+    );
+  }
+
+  if (!wordList) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <p className="text-gray-500">Word list not found</p>
+        <Button variant="outline" onClick={() => navigate("/word-lists")}>
+          Return to Word Lists
+        </Button>
+      </div>
+    );
+  }
+
   const filteredWords = wordList.words.filter((word) =>
     word.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -248,9 +299,19 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
     <div className="space-y-4">
       <CardHeader className="px-0">
         <div className="flex items-center justify-between px-2 gap-4">
-          <CardTitle className="text-xl font-bold">
-            Word List: {wordList.name}
-          </CardTitle>
+          <div className="space-y-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/word-lists")}
+              className="mb-2"
+            >
+              ← Back to Word Lists
+            </Button>
+            <CardTitle className="text-2xl font-bold">
+              Word List: {wordList.name}
+            </CardTitle>
+          </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline">Add New Word</Button>

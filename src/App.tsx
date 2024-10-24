@@ -16,6 +16,7 @@ import { GroupSelectionPage } from "./pages/GroupSelectionPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { StudentGroupsPage } from "./pages/StudentGroupsPage";
 import WordListsPage from "./pages/WordListsPage";
+import WordListDetailPage from "./pages/WordListDetailPage";
 
 const ProtectedRoute: React.FC = () => {
   const { user, loading } = useAuth();
@@ -61,7 +62,10 @@ const App: React.FC = () => {
           <Route element={<ProtectedRoute />}>
             <Route element={<MainLayout />}>
               <Route path="/dashboard" element={<DashboardPage />} />
+              
+              {/* Word Lists Routes */}
               <Route path="/word-lists" element={<WordListsPage />} />
+              <Route path="/word-lists-detail/:id" element={<WordListDetailPage />} />
               
               <Route path="/student-groups" element={<StudentGroupsPage />} />
               <Route path="/settings" element={<div>Settings Page</div>} />
