@@ -34,6 +34,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { WordList, wordListApi } from "@/api/wordListApi";
 import { toast } from "@/hooks/use-toast";
 import { AxiosError } from "axios";
+import { secondaryDb } from "@/utils/firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 // Update these interfaces to match the actual API response
 interface WordOperationResponse {
@@ -91,6 +93,21 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
         ...wordList,
         words: [...wordList.words, response.word],
       };
+
+      if(wordList.owner.user_id!=undefined){
+        try {
+          const docRef = doc(secondaryDb, "wordList", wordList.owner.user_id.toString());
+          await setDoc(
+            docRef,
+            {
+              updatedAt: new Date().getTime(),
+            },
+            { merge: true }
+          );
+        } catch (error) {
+          console.error("Error updating wordList:", error);
+        }
+      }
 
       // Update the parent component
       onWordListUpdate(updatedWordList);
@@ -161,6 +178,21 @@ const WordListDetailPage: React.FC<WordListDetailPageProps> = ({
         ...wordList,
         words: wordList.words.filter((word) => word !== response.word),
       };
+
+      if(wordList.owner.user_id!=undefined){
+        try {
+          const docRef = doc(secondaryDb, "wordList", wordList.owner.user_id.toString());
+          await setDoc(
+            docRef,
+            {
+              updatedAt: new Date().getTime(),
+            },
+            { merge: true }
+          );
+        } catch (error) {
+          console.error("Error updating wordList:", error);
+        }
+      }
 
       // Update the parent component
       onWordListUpdate(updatedWordList);
