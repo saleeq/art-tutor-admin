@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,12 +36,38 @@ import { WordList, wordListApi } from "@/api/wordListApi";
 import { useToast } from "@/hooks/use-toast";
 import { AxiosError } from "axios";
 import { secondaryDb } from "@/utils/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
+import { ArrowLeft, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 
 interface WordOperationResponse {
   message: string;
   word: string;
 }
+
+const MobileWordCard: React.FC<{
+  word: string;
+  onDelete: (word: string) => void;
+  isDeleting: boolean;
+}> = ({ word, onDelete, isDeleting }) => (
+  <Card className="mb-2">
+    <CardContent className="p-4 flex justify-between items-center">
+      <span className="font-medium">{word}</span>
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={() => onDelete(word)}
+        disabled={isDeleting}
+        className="h-8 px-3"
+      >
+        {isDeleting ? (
+          <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+        ) : (
+          <Trash2 className="h-4 w-4" />
+        )}
+      </Button>
+    </CardContent>
+  </Card>
+);
 
 const WordListDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -55,8 +81,53 @@ const WordListDetailPage: React.FC = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [wordToDelete, setWordToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [localUpdateTimestamp, setLocalUpdateTimestamp] = useState<number | null>(null);
+  const isLocalUpdate = useRef(false);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
   const { serverToken } = useAuth();
   const { toast } = useToast();
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Function to refresh word list data
+  const refreshWordList = async () => {
+    if (!serverToken || !id) return;
+
+    try {
+      const allLists = await wordListApi.getAllWordLists(serverToken);
+      const foundList = allLists.find(list => list.id === Number(id));
+      if (foundList) {
+        setWordList(foundList);
+      }
+    } catch (error) {
+      console.error("Error refreshing word list:", error);
+    }
+  };
+
+  // Function to update Firestore
+  const updateFirestore = async (userId: string) => {
+    try {
+      const timestamp = new Date().getTime();
+      isLocalUpdate.current = true;
+      setLocalUpdateTimestamp(timestamp);
+      
+      const docRef = doc(secondaryDb, "wordList", userId);
+      await setDoc(docRef, {
+        updatedAt: timestamp,
+      }, { merge: true });
+    } catch (error) {
+      console.error("Error updating firestore:", error);
+      isLocalUpdate.current = false;
+    }
+  };
 
   useEffect(() => {
     const loadWordList = async () => {
@@ -68,7 +139,6 @@ const WordListDetailPage: React.FC = () => {
 
       setIsLoading(true);
       try {
-        console.log("Fetching word list with ID:", id);
         const allLists = await wordListApi.getAllWordLists(serverToken);
         const foundList = allLists.find(list => list.id === Number(id));
         
@@ -83,8 +153,26 @@ const WordListDetailPage: React.FC = () => {
           return;
         }
 
-        console.log("Found word list:", foundList);
         setWordList(foundList);
+
+        if (foundList.owner.user_id) {
+          const docRef = doc(secondaryDb, "wordList", foundList.owner.user_id.toString());
+          
+          if (unsubscribeRef.current) {
+            unsubscribeRef.current();
+          }
+
+          unsubscribeRef.current = onSnapshot(docRef, (docSnapshot) => {
+            const data = docSnapshot.data();
+            if (data && data.updatedAt) {
+              if (!isLocalUpdate.current && data.updatedAt !== localUpdateTimestamp) {
+                console.log("External update detected, refreshing word list");
+                refreshWordList();
+              }
+              isLocalUpdate.current = false;
+            }
+          });
+        }
       } catch (error) {
         console.error("Error fetching word list:", error);
         toast({
@@ -99,8 +187,13 @@ const WordListDetailPage: React.FC = () => {
     };
 
     loadWordList();
-  }, [serverToken, id, navigate, toast]);
 
+    return () => {
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+      }
+    };
+  }, [serverToken, id, navigate, toast]);
   const handleAddWord = async (e?: React.FormEvent) => {
     if (e) {
       e.preventDefault();
@@ -110,7 +203,6 @@ const WordListDetailPage: React.FC = () => {
 
     const wordToAdd = newWord.trim();
 
-    // Check for duplicate word
     if (wordList.words.includes(wordToAdd)) {
       toast({
         title: "Error",
@@ -122,13 +214,12 @@ const WordListDetailPage: React.FC = () => {
 
     setIsAddingWord(true);
     try {
-      const response = (await wordListApi.addWord(
+      const response = await wordListApi.addWord(
         serverToken,
         wordList.id,
         wordToAdd
-      )) as WordOperationResponse;
+      ) as WordOperationResponse;
 
-      // Update the local state with the new word
       setWordList((prev) => {
         if (!prev) return null;
         return {
@@ -138,21 +229,9 @@ const WordListDetailPage: React.FC = () => {
       });
 
       if (wordList.owner.user_id !== undefined) {
-        try {
-          const docRef = doc(secondaryDb, "wordList", wordList.owner.user_id.toString());
-          await setDoc(
-            docRef,
-            {
-              updatedAt: new Date().getTime(),
-            },
-            { merge: true }
-          );
-        } catch (error) {
-          console.error("Error updating wordList:", error);
-        }
+        await updateFirestore(wordList.owner.user_id.toString());
       }
 
-      // Clear the input and close the dialog
       setNewWord("");
       setIsAddDialogOpen(false);
 
@@ -163,28 +242,7 @@ const WordListDetailPage: React.FC = () => {
       });
     } catch (error) {
       console.error("Error adding word:", error);
-
-      if (error instanceof AxiosError) {
-        const errorMessage =
-          error.response?.data?.detail ||
-          error.response?.data?.message ||
-          "Failed to add the word. Please try again.";
-
-        toast({
-          title: error.response?.status === 422 ? "Validation Error" : "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description:
-            error instanceof Error
-              ? error.message
-              : "An unexpected error occurred. Please try again.",
-          variant: "destructive",
-        });
-      }
+      handleApiError(error, "Failed to add the word. Please try again.");
     } finally {
       setIsAddingWord(false);
     }
@@ -199,13 +257,12 @@ const WordListDetailPage: React.FC = () => {
 
     setIsDeletingWord(wordToDelete);
     try {
-      const response = (await wordListApi.deleteWord(
+      const response = await wordListApi.deleteWord(
         serverToken,
         wordList.id,
         wordToDelete
-      )) as WordOperationResponse;
+      ) as WordOperationResponse;
 
-      // Update local state by removing the deleted word
       setWordList((prev) => {
         if (!prev) return null;
         return {
@@ -215,18 +272,7 @@ const WordListDetailPage: React.FC = () => {
       });
 
       if (wordList.owner.user_id !== undefined) {
-        try {
-          const docRef = doc(secondaryDb, "wordList", wordList.owner.user_id.toString());
-          await setDoc(
-            docRef,
-            {
-              updatedAt: new Date().getTime(),
-            },
-            { merge: true }
-          );
-        } catch (error) {
-          console.error("Error updating wordList:", error);
-        }
+        await updateFirestore(wordList.owner.user_id.toString());
       }
 
       toast({
@@ -236,31 +282,31 @@ const WordListDetailPage: React.FC = () => {
       });
     } catch (error) {
       console.error("Error deleting word:", error);
-
-      if (error instanceof AxiosError) {
-        const errorMessage =
-          error.response?.data?.detail ||
-          error.response?.data?.message ||
-          "Failed to delete the word. Please try again.";
-
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Error",
-          description:
-            error instanceof Error
-              ? error.message
-              : "An unexpected error occurred. Please try again.",
-          variant: "destructive",
-        });
-      }
+      handleApiError(error, "Failed to delete the word. Please try again.");
     } finally {
       setIsDeletingWord(null);
       setWordToDelete(null);
+    }
+  };
+
+  const handleApiError = (error: unknown, defaultMessage: string) => {
+    if (error instanceof AxiosError) {
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        defaultMessage;
+
+      toast({
+        title: error.response?.status === 422 ? "Validation Error" : "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : defaultMessage,
+        variant: "destructive",
+      });
     }
   };
 
@@ -298,23 +344,23 @@ const WordListDetailPage: React.FC = () => {
   return (
     <div className="space-y-4">
       <CardHeader className="px-0">
-        <div className="flex items-center justify-between px-2 gap-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between px-2 gap-4">
           <div className="space-y-1">
+           
+            <CardTitle className="flex text-xl md:text-2xl font-bold gap-2">
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={() => navigate("/word-lists")}
               className="mb-2"
             >
-              ← Back to Word Lists
-            </Button>
-            <CardTitle className="text-2xl font-bold">
-              Word List: {wordList.name}
+              <ArrowLeft/> 
+            </Button>{wordList.name}
             </CardTitle>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="outline">Add New Word</Button>
+              <Button variant="outline" className="w-full md:w-auto">Add New Word</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -343,6 +389,7 @@ const WordListDetailPage: React.FC = () => {
                   <Button
                     type="submit"
                     disabled={isAddingWord || !newWord.trim()}
+                    className="w-full md:w-auto"
                   >
                     {isAddingWord ? <LoadingSpinner /> : "Add Word"}
                   </Button>
@@ -352,52 +399,66 @@ const WordListDetailPage: React.FC = () => {
           </Dialog>
         </div>
       </CardHeader>
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
         <Input
           placeholder="Search words"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-xs"
+          className="w-full md:max-w-xs"
         />
         <Button
           variant="outline"
           onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+          className="w-full md:w-auto"
         >
-          Sort {sortOrder === "asc" ? "↑" : "↓"}
+          Sort {sortOrder === "asc" ? <ChevronUp className="ml-2 h-4 w-4" /> : <ChevronDown className="ml-2 h-4 w-4" />}
         </Button>
       </div>
-      <div className="bg-white shadow-md rounded-lg overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Word</TableHead>
-              <TableHead className="w-[100px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedWords.map((word, index) => (
-              <TableRow
-                key={`${word}-${index}`}
-                className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
-              >
-                <TableCell>{word}</TableCell>
-                <TableCell>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => initiateDeleteWord(word)}
-                    disabled={isDeletingWord === word}
-                  >
-                    {isDeletingWord === word ? <LoadingSpinner /> : "Delete"}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
 
-      {/* Delete Confirmation Dialog */}
+      {isMobile ? (
+        <div className="space-y-2">
+          {sortedWords.map((word, index) => (
+            <MobileWordCard
+              key={`${word}-${index}`}
+              word={word}
+              onDelete={initiateDeleteWord}
+              isDeleting={isDeletingWord === word}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white shadow-md rounded-lg overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Word</TableHead>
+                <TableHead className="w-[100px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedWords.map((word, index) => (
+                <TableRow
+                  key={`${word}-${index}`}
+                  className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}
+                >
+                  <TableCell>{word}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => initiateDeleteWord(word)}
+                      disabled={isDeletingWord === word}
+                    >
+                      {isDeletingWord === word ? <LoadingSpinner /> : "Delete"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
       <AlertDialog
         open={!!wordToDelete}
         onOpenChange={(open) => !open && setWordToDelete(null)}
@@ -410,11 +471,11 @@ const WordListDetailPage: React.FC = () => {
               cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="w-full sm:w-auto mt-0">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteWord}
-              className="bg-red-500 hover:bg-red-600"
+              className="w-full sm:w-auto bg-red-500 hover:bg-red-600"
             >
               {isDeletingWord ? <LoadingSpinner /> : "Delete"}
             </AlertDialogAction>

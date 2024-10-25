@@ -1,33 +1,41 @@
-// src/components/layout/MainLayout.tsx
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate, Outlet } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import {
-  // Palette,
-  // BookOpen,
   Users,
-  // Settings,
   Menu,
   X,
   LogOut,
   ChevronRight,
+  MoreVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  const navItems = [
-    // { path: "/dashboard", name: "Dashboard", icon: Palette },
-    // { path: "/lessons", name: "Lessons", icon: BookOpen },
-    // { path: "/student-groups", name: "Student Groups", icon: Users },
-    { path: "/word-lists", name: "Word Lists", icon: Users },
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
 
-    // { path: "/settings", name: "Settings", icon: Settings },
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const navItems = [
+    { path: "/word-lists", name: "Word Lists", icon: Users },
   ];
 
   const handleLogout = async () => {
@@ -49,6 +57,58 @@ export const MainLayout: React.FC = () => {
       }),
     ];
   };
+
+  const MobileAppBar = () => (
+    <header className="bg-background border-b border-border shadow-sm z-20 flex items-center justify-between p-3">
+      <div className="flex items-center">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="text-foreground hover:text-primary mr-3"
+        >
+          <Menu size={24} />
+        </button>
+        <Avatar className="h-8 w-8">
+          <AvatarImage src={user?.photoURL || undefined} />
+          <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
+        </Avatar>
+      </div>
+      
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" size="icon">
+            <MoreVertical className="h-5 w-5" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem className="text-sm text-muted-foreground">
+            {user?.email}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLogout}>
+            <LogOut className="mr-2 h-4 w-4" />
+            Logout
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </header>
+  );
+
+  const DesktopAppBar = () => (
+    <header className="bg-background border-b border-border shadow-sm z-20 flex items-center justify-between p-4">
+      <div className="flex items-center">
+        <Avatar className="h-8 w-8 mr-2">
+          <AvatarImage src={user?.photoURL || undefined} />
+          <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
+        </Avatar>
+        <span className="text-sm font-medium text-foreground mr-4">
+          {user?.email}
+        </span>
+        <Button variant="outline" size="sm" onClick={handleLogout}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Logout
+        </Button>
+      </div>
+    </header>
+  );
 
   return (
     <div className="flex h-screen bg-background">
@@ -85,27 +145,7 @@ export const MainLayout: React.FC = () => {
       {/* Main content */}
       <div className="flex-1 flex flex-col lg:ml-64">
         {/* App Bar */}
-        <header className="bg-background border-b border-border shadow-sm z-20 flex items-center justify-between p-4">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="lg:hidden text-foreground hover:text-primary"
-          >
-            <Menu size={24} />
-          </button>
-          <div className="flex items-center">
-            <Avatar className="h-8 w-8 mr-2">
-              <AvatarImage src={user?.photoURL || undefined} />
-              <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
-            </Avatar>
-            <span className="text-sm font-medium text-foreground mr-4">
-              {user?.email}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleLogout}>
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </Button>
-          </div>
-        </header>
+        {isMobile ? <MobileAppBar /> : <DesktopAppBar />}
 
         {/* Breadcrumb */}
         <nav className="bg-gray-100 px-4 py-2 text-gray-400 text-xs z-10">
