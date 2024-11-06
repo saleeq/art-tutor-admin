@@ -44,18 +44,18 @@ const LoginForm: React.FC = () => {
   };
 
   return (
-    <Card className="shadow-md">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-xl sm:text-2xl text-center">
+    <Card className="w-full max-w-md mx-auto shadow-lg">
+      <CardHeader className="space-y-2 px-8 pt-8">
+        <CardTitle className="text-2xl font-bold text-center">
           Sign in to your account
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
+      <CardContent className="px-8 pb-8 pt-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-3">
             <Label 
               htmlFor="email" 
-              className="text-sm font-medium flex items-center gap-2"
+              className="text-sm font-medium flex items-center gap-3"
             >
               <Mail className="h-4 w-4" />
               Email Address
@@ -66,15 +66,15 @@ const LoginForm: React.FC = () => {
               placeholder="name@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="h-10"
+              className="h-11"
               required
             />
           </div>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label 
               htmlFor="password" 
-              className="text-sm font-medium flex items-center gap-2"
+              className="text-sm font-medium flex items-center gap-3"
             >
               <Lock className="h-4 w-4" />
               Password
@@ -86,13 +86,13 @@ const LoginForm: React.FC = () => {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-10 pr-10"
+                className="h-11 pr-12"
                 required
               />
               <button
                 type="button"
                 onClick={togglePasswordVisibility}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 focus:outline-none"
               >
                 {showPassword ? (
                   <EyeOffIcon className="h-5 w-5" />
@@ -105,7 +105,7 @@ const LoginForm: React.FC = () => {
 
           <Button 
             type="submit" 
-            className="w-full" 
+            className="w-full h-11 mt-8" 
             disabled={isLoading}
           >
             {isLoading ? "Signing in..." : "Sign In"}
