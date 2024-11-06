@@ -96,6 +96,7 @@ export const GroupSelectionPage: React.FC = () => {
         setError(null);
       }
     } catch (error) {
+      
       console.error("Failed to fetch groups:", error);
       setError("Failed to load groups. Please try again.");
       toast({
@@ -103,6 +104,7 @@ export const GroupSelectionPage: React.FC = () => {
         description: "Failed to load groups. Please try again.",
         variant: "destructive",
       });
+      navigate("/login");
     } finally {
       setLoading(false);
     }
