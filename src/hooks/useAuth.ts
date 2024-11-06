@@ -1,4 +1,4 @@
-import { useContext, useState, useEffect, useCallback } from "react";
+import { useContext, useState, useEffect } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { auth } from "../utils/firebase";
 import {
@@ -23,7 +23,7 @@ export const useAuth = () => {
   const [serverToken, setServerToken] = useState<string | null>(
     localStorage.getItem("serverToken")
   );
-  const [apiClient] = useState(() => createApiClient(serverToken));
+  const [apiClient] = useState(() => createApiClient());
 
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");

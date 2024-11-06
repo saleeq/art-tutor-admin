@@ -5,7 +5,7 @@ import { API_BASE_URL } from "@/config";
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
 
-const createApiClient = (initialToken?: string | null): AxiosInstance => {
+const createApiClient = (): AxiosInstance => {
   const apiClient = axios.create({
     baseURL: API_BASE_URL,
     headers: {
