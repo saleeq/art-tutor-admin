@@ -48,6 +48,24 @@ export const wordListApi = {
     }
   },
 
+  // Added getWordList method
+  getWordList: async (token: string, wordListId: string | number): Promise<WordList> => {
+    try {
+      // First try to find the word list in the full list
+      const allLists = await wordListApi.getAllWordLists(token);
+      const wordList = allLists.find(list => list.id === Number(wordListId));
+      
+      if (!wordList) {
+        throw new Error("Word list not found");
+      }
+
+      return wordList;
+    } catch (error) {
+      console.error("Error fetching word list:", error);
+      throw error;
+    }
+  },
+
   createWordList: async (
     token: string,
     wordListData: Omit<
