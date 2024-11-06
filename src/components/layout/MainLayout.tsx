@@ -59,7 +59,7 @@ export const MainLayout: React.FC = () => {
         } lg:translate-x-0 transition duration-200 ease-in-out z-30`}
       >
         <div className="flex items-center justify-between h-16 px-4 bg-primary text-primary-foreground">
-          <span className="text-2xl font-semibold">Art Tutor</span>
+          <span className="text-2xl font-semibold">Art Tutor 1.1</span>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden">
             <X size={24} />
           </button>
