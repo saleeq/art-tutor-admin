@@ -1,8 +1,6 @@
-// src/hooks/useAuth.ts
-import { useContext, useState, useEffect } from "react";
+import { useContext, useState, useEffect, useCallback } from "react";
 import { AuthContext } from "../contexts/AuthContext";
 import { auth } from "../utils/firebase";
-import axios from "axios";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -10,7 +8,7 @@ import {
   sendPasswordResetEmail,
   User,
 } from "firebase/auth";
-import { API_BASE_URL } from "@/config";
+import createApiClient from "@/utils/apiClient";
 
 interface ServerAuthResponse {
   message: string;
@@ -25,6 +23,7 @@ export const useAuth = () => {
   const [serverToken, setServerToken] = useState<string | null>(
     localStorage.getItem("serverToken")
   );
+  const [apiClient] = useState(() => createApiClient(serverToken));
 
   if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
@@ -43,8 +42,8 @@ export const useAuth = () => {
   ): Promise<ServerAuthResponse> => {
     const firebaseToken = await firebaseUser.getIdToken();
     try {
-      const response = await axios.post<ServerAuthResponse>(
-        `${API_BASE_URL}users/user-auth/login/`,
+      const response = await apiClient.post<ServerAuthResponse>(
+        "users/user-auth/login/",
         { firebase_token: firebaseToken }
       );
       if (response.data.status === 200) {
@@ -115,5 +114,6 @@ export const useAuth = () => {
     resetPassword,
     serverToken,
     getServerToken,
+    apiClient,
   };
 };
